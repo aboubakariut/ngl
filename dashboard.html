@@ -16,7 +16,14 @@
 <div id="root"></div>
 
 <script>
-  const token = new URLSearchParams(location.search).get("token") || "";
+  const STORAGE_KEY = "abk_ngl_token";
+  const tokenFromUrl = new URLSearchParams(location.search).get("token");
+  if (tokenFromUrl) {
+    localStorage.setItem(STORAGE_KEY, tokenFromUrl);
+    // nettoie l'URL pour ne plus laisser le token visible dans la barre d'adresse / l'historique
+    history.replaceState({}, "", location.pathname);
+  }
+  const token = tokenFromUrl || localStorage.getItem(STORAGE_KEY) || "";
   const root = document.getElementById("root");
   let messages = [];
 
@@ -116,7 +123,7 @@
   }
 
   async function init() {
-    if (!token) return renderGate("Accès refusé. Utilise le lien complet avec ton token (?token=...).");
+    if (!token) return renderGate("Accès refusé. Ouvre ton lien complet une première fois (?token=...) — il sera mémorisé ensuite.");
     renderGate("Chargement...");
     try {
       const res = await fetch("/api/dashboard", {
@@ -125,7 +132,10 @@
         body: JSON.stringify({ token }),
       });
       const data = await res.json();
-      if (!data.valid) return renderGate("Lien d'accès invalide ou expiré.");
+      if (!data.valid) {
+        localStorage.removeItem(STORAGE_KEY);
+        return renderGate("Lien d'accès invalide ou expiré.");
+      }
       messages = data.messages || [];
       renderList();
     } catch {

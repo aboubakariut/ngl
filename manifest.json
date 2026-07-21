@@ -2,7 +2,7 @@
   "name": "Messages",
   "short_name": "Messages",
   "description": "Envoie-moi un message privé",
-  "start_url": "/",
+  "start_url": "/dashboard",
   "display": "standalone",
   "background_color": "#0b0f14",
   "theme_color": "#0b0f14",

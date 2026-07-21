@@ -47,8 +47,18 @@ va dans les **logs de build Vercel** pour récupérer le token d'accès génér�
 ## 3. Utilisation
 
 - Page publique : `https://ton-domaine.vercel.app/m?to=contact`
-- Dashboard : `https://ton-domaine.vercel.app/dashboard?token=TON_TOKEN`
-- Installable comme app (PWA) depuis le navigateur.
+- Dashboard : ouvre **une seule fois** `https://ton-domaine.vercel.app/dashboard?token=TON_TOKEN`
+  — le token est alors mémorisé dans le navigateur (`localStorage`) et retiré
+  de l'URL. Ensuite, il te suffit d'ouvrir `/dashboard` (sans rien coller)
+  pour accéder à tes messages, sur ce même navigateur/appareil.
+- Installable comme app (PWA) : uniquement depuis `/dashboard` — la page
+  publique `/m` n'est pas installable, pour éviter que les personnes à qui
+  tu envoies le lien puissent ajouter "ton" app à leur écran d'accueil.
+  L'icône ouvre directement le dashboard (`start_url` dans `manifest.json`).
+- Si tu changes de navigateur ou d'appareil, tu dois rouvrir le lien complet
+  avec `?token=...` une fois pour le remémoriser à cet endroit-là aussi.
+- Si le token est révoqué côté Supabase, il est automatiquement effacé du
+  navigateur au prochain chargement.
 
 ## Note
 
