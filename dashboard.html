@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Messages reçus</title>
+<meta name="theme-color" content="#0b0f14" />
+<link rel="manifest" href="/manifest.json" />
+<link rel="apple-touch-icon" href="/icons/icon-192.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+<div id="root"></div>
+
+<script>
+  const token = new URLSearchParams(location.search).get("token") || "";
+  const root = document.getElementById("root");
+  let messages = [];
+
+  function formatDate(iso) {
+    return new Date(iso).toLocaleString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+  }
+
+  function renderGate(text) {
+    root.innerHTML = `<div class="token-gate">${text}</div>`;
+  }
+
+  function renderList() {
+    const unread = messages.filter((m) => !m.is_lu).length;
+    if (messages.length === 0) {
+      root.innerHTML = `
+        <div class="dash"><div class="dash-inner">
+          <div class="dash-header"><h1 class="dash-title">Messages reçus</h1></div>
+          <div class="empty-state">Aucun message pour le moment.</div>
+        </div></div>`;
+      return;
+    }
+    const rows = messages.map((m) => `
+      <div class="msg-row ${!m.is_lu ? "unread" : ""}" data-id="${m.id}">
+        <p class="msg-preview">${escapeHtml(m.contenu)}</p>
+        <div class="msg-row-meta">
+          <span>${formatDate(m.created_at)}</span>
+          <span>${m.type_appareil || "?"}</span>
+          <span>${m.navigateur || "?"}</span>
+          ${m.ville ? `<span>${escapeHtml(m.ville)}</span>` : ""}
+        </div>
+      </div>`).join("");
+
+    root.innerHTML = `
+      <div class="dash"><div class="dash-inner">
+        <div class="dash-header">
+          <h1 class="dash-title">Messages reçus</h1>
+          <span class="dash-meta">${messages.length} message${messages.length > 1 ? "s" : ""} · ${unread} non lu(s)</span>
+        </div>
+        <div class="msg-list">${rows}</div>
+      </div></div>`;
+
+    root.querySelectorAll(".msg-row").forEach((el) => {
+      el.addEventListener("click", () => openMessage(el.dataset.id));
+    });
+  }
+
+  function escapeHtml(s) {
+    return (s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  async function openMessage(id) {
+    const msg = messages.find((m) => m.id === id);
+    if (!msg) return;
+    if (!msg.is_lu) {
+      msg.is_lu = true;
+      fetch("/api/messages", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, token }),
+      }).catch(() => {});
+    }
+
+    const overlay = document.createElement("div");
+    overlay.className = "overlay";
+    overlay.innerHTML = `
+      <div class="detail-card">
+        <p class="detail-content">${escapeHtml(msg.contenu)}</p>
+        <div class="detail-grid">
+          <div><div class="detail-label">Reçu le</div>${formatDate(msg.created_at)}</div>
+          <div><div class="detail-label">Adresse IP</div>${msg.ip_adresse || "—"}</div>
+          <div><div class="detail-label">Navigateur</div>${msg.navigateur || "—"} (${msg.moteur_navigateur || "—"})</div>
+          <div><div class="detail-label">Système</div>${msg.os || "—"}</div>
+          <div><div class="detail-label">Appareil</div>${msg.type_appareil || "—"}${msg.modele_appareil ? " · " + escapeHtml(msg.modele_appareil) : ""}</div>
+          <div><div class="detail-label">Localisation</div>${[msg.ville, msg.pays].filter(Boolean).map(escapeHtml).join(", ") || "—"}</div>
+          <div><div class="detail-label">Langue</div>${msg.langue || "—"}</div>
+          <div><div class="detail-label">Référent</div>${msg.referer || "—"}</div>
+          <div style="grid-column:1/-1"><div class="detail-label">User-Agent complet</div><span class="word-break">${msg.user_agent || "—"}</span></div>
+        </div>
+        <div class="detail-actions">
+          <button class="btn btn-whatsapp" id="wa-btn">Répondre via WhatsApp</button>
+          <button class="btn btn-close" id="close-btn">Fermer</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
+    overlay.querySelector("#close-btn").addEventListener("click", () => overlay.remove());
+    overlay.querySelector("#wa-btn").addEventListener("click", async () => {
+      const text = `Message reçu : "${msg.contenu}"`;
+      if (navigator.share) {
+        try { await navigator.share({ text }); return; } catch {}
+      }
+      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
+    });
+
+    renderList();
+  }
+
+  async function init() {
+    if (!token) return renderGate("Accès refusé. Utilise le lien complet avec ton token (?token=...).");
+    renderGate("Chargement...");
+    try {
+      const res = await fetch("/api/dashboard", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+      });
+      const data = await res.json();
+      if (!data.valid) return renderGate("Lien d'accès invalide ou expiré.");
+      messages = data.messages || [];
+      renderList();
+    } catch {
+      renderGate("Erreur de connexion.");
+    }
+  }
+
+  init();
+
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js"));
+  }
+</script>
+</body>
+</html>

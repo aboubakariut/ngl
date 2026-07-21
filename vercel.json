@@ -1,0 +1,5 @@
+{
+  "buildCommand": "node init-db.js",
+  "outputDirectory": ".",
+  "cleanUrls": true
+}

@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Envoie-moi un message</title>
+<meta name="theme-color" content="#0b0f14" />
+<link rel="manifest" href="/manifest.json" />
+<link rel="apple-touch-icon" href="/icons/icon-192.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+<main class="send-page">
+  <div class="send-card">
+    <div class="send-eyebrow">Message privé</div>
+    <h1 class="send-title">Envoie-moi un message</h1>
+    <p class="send-sub">Écris ce que tu veux, ça arrive directement dans ma boîte. Sois honnête.</p>
+
+    <form id="form">
+      <textarea id="contenu" class="send-textarea" placeholder="Écris ton message ici..." maxlength="800" required></textarea>
+      <div class="send-footer">
+        <span id="count" class="send-count">0/800</span>
+        <button id="btn" class="send-btn" type="submit">Envoyer</button>
+      </div>
+      <p id="error" style="color:#d1594a;font-size:13px;margin-top:10px;display:none"></p>
+    </form>
+    <p id="success" class="send-success" style="display:none">Message envoyé. Merci !</p>
+
+    <p class="send-disclosure">
+      Par transparence : les informations techniques de ta connexion (adresse IP, navigateur, type d'appareil) sont enregistrées avec ton message.
+    </p>
+  </div>
+</main>
+
+<script>
+  const slug = new URLSearchParams(location.search).get("to") || "";
+  const form = document.getElementById("form");
+  const textarea = document.getElementById("contenu");
+  const count = document.getElementById("count");
+  const btn = document.getElementById("btn");
+  const errorEl = document.getElementById("error");
+
+  textarea.addEventListener("input", () => {
+    count.textContent = `${textarea.value.length}/800`;
+  });
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const contenu = textarea.value.trim();
+    if (!contenu) return;
+    btn.disabled = true;
+    btn.textContent = "Envoi...";
+    errorEl.style.display = "none";
+    try {
+      const res = await fetch("/api/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug, contenu }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error === "lien invalide" ? "Ce lien n'existe pas ou plus." : "Échec de l'envoi.");
+      form.style.display = "none";
+      document.getElementById("success").style.display = "block";
+    } catch (err) {
+      errorEl.textContent = err.message;
+      errorEl.style.display = "block";
+      btn.disabled = false;
+      btn.textContent = "Envoyer";
+    }
+  });
+
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js"));
+  }
+</script>
+</body>
+</html>
